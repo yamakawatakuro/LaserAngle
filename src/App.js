@@ -2,9 +2,9 @@ import React, { useState } from 'react';
 import { AlertCircle } from 'lucide-react';
 
 export default function LaserAngleCalculator() {
-  const [laserDepth, setLaserDepth] = useState(5);
-  const [laserHeight, setLaserHeight] = useState(6);
-  const [laserAngle, setLaserAngle] = useState(45); // 下向き角度（正の値）
+  const [laserDepth, setLaserDepth] = useState(0);
+  const [laserHeight, setLaserHeight] = useState(10);
+  const [laserAngle, setLaserAngle] = useState(-45); // 下向き角度（正の値）
   const [laserSpread] = useState(50); // 固定50度
   const [performerDepth, setPerformerDepth] = useState(5);
   const [performerHeight, setPerformerHeight] = useState(1.7);
@@ -82,6 +82,24 @@ export default function LaserAngleCalculator() {
   
   const upperFloorDepth = calculateFloorIntersection(upperEdgeAngle);
   const lowerFloorDepth = calculateFloorIntersection(lowerEdgeAngle);
+  
+  // レーザーから演者の頭上+0.3mを通る線が床に落ちる位置を計算
+  const calculatePerformerLineFloor = () => {
+    const safetyMargin = 0.3; // 安全マージン
+    const dDepth = performerDepth - laserDepth;
+    const dHeight = (performerHeight + performerRadius + safetyMargin) - laserHeight; // 演者の頭頂部+0.3m
+    
+    if (dDepth <= 0 || dHeight >= 0) return null; // 演者が後ろまたは上にいる
+    
+    // 床までの距離を計算
+    const angleToPerformerTop = Math.atan2(dHeight, dDepth);
+    const remainingHeight = performerHeight + performerRadius + safetyMargin; // 頭頂部+0.3mから床までの高さ
+    const depthFromPerformer = remainingHeight / Math.abs(Math.tan(angleToPerformerTop));
+    
+    return performerDepth + depthFromPerformer;
+  };
+  
+  const performerLineFloorDepth = calculatePerformerLineFloor();
 
   return (
     <div className="w-full max-w-6xl mx-auto p-6 bg-gray-900 text-white">
@@ -138,6 +156,30 @@ export default function LaserAngleCalculator() {
               stroke="#ffff00"
               strokeWidth="2"
             />
+            
+            {/* レーザーから演者の頭上+0.3mを通る線 */}
+            <line
+              x1={laserDepth * scale}
+              y1={(stageHeight - laserHeight) * scale}
+              x2={performerDepth * scale}
+              y2={(stageHeight - performerHeight - performerRadius - 0.3) * scale}
+              stroke="#00ffff"
+              strokeWidth="2"
+              strokeDasharray="3,3"
+            />
+            
+            {/* 演者の頭上+0.3mから床への延長線 */}
+            {performerLineFloorDepth !== null && performerLineFloorDepth >= 0 && performerLineFloorDepth <= stageDepth && (
+              <line
+                x1={performerDepth * scale}
+                y1={(stageHeight - performerHeight - performerRadius - 0.3) * scale}
+                x2={performerLineFloorDepth * scale}
+                y2={stageHeight * scale}
+                stroke="#00ffff"
+                strokeWidth="2"
+                strokeDasharray="3,3"
+              />
+            )}
             
             {/* レーザー本体（釣り下げ） */}
             <line
@@ -263,6 +305,30 @@ export default function LaserAngleCalculator() {
                 </text>
               </>
             )}
+            
+            {/* レーザー→演者の線が床に落ちる位置 */}
+            {performerLineFloorDepth !== null && performerLineFloorDepth >= 0 && performerLineFloorDepth <= stageDepth && (
+              <>
+                <circle
+                  cx={performerLineFloorDepth * scale}
+                  cy={stageHeight * scale}
+                  r="5"
+                  fill="#00ffff"
+                  stroke="#00cccc"
+                  strokeWidth="2"
+                />
+                <text
+                  x={performerLineFloorDepth * scale}
+                  y={stageHeight * scale + 25}
+                  textAnchor="middle"
+                  fill="#00ffff"
+                  fontSize="11"
+                  fontWeight="bold"
+                >
+                  頭上+0.3m: {performerLineFloorDepth.toFixed(2)}m
+                </text>
+              </>
+            )}
           </svg>
           
           {/* 警告表示 */}
@@ -297,6 +363,11 @@ export default function LaserAngleCalculator() {
                 <p>レーザー上端: <span className="font-mono text-orange-400">{lowerFloorDepth.toFixed(2)}m</span></p>
               ) : (
                 <p className="text-gray-400">レーザー上端: 床に到達しません</p>
+              )}
+              {performerLineFloorDepth !== null && performerLineFloorDepth >= 0 && performerLineFloorDepth <= stageDepth ? (
+                <p>頭上+0.3m通過: <span className="font-mono text-cyan-400">{performerLineFloorDepth.toFixed(2)}m</span></p>
+              ) : (
+                <p className="text-gray-400">頭上+0.3m通過: 床に到達しません</p>
               )}
               {upperFloorDepth !== null && lowerFloorDepth !== null && 
                upperFloorDepth >= 0 && upperFloorDepth <= stageDepth &&
